@@ -25,17 +25,17 @@ contract DaiVox is DSThing {
     uint256  _par;
     uint256  _way;
 
-    uint256  public  fix;
+    uint256  public  wethPerDaiAtSettlement;
     uint256  public  how;
     uint256  public  tau;
 
     function DaiVox(uint par_) public {
-        _par = fix = par_;
-        _way = RAY;
-        tau  = era();
+        _par = wethPerDaiAtSettlement = par_;
+        _way = ONE_27;
+        tau  = getCurrentTimestamp();
     }
 
-    function era() public view returns (uint) {
+    function getCurrentTimestamp() public view returns (uint) {
         return block.timestamp;
     }
 
@@ -54,30 +54,30 @@ contract DaiVox is DSThing {
     }
 
     function tell(uint256 ray) public note auth {
-        fix = ray;
+        wethPerDaiAtSettlement = ray;
     }
     function tune(uint256 ray) public note auth {
         how = ray;
     }
 
     function prod() public note {
-        var age = era() - tau;
+        var age = getCurrentTimestamp() - tau;
         if (age == 0) return;  // optimised
-        tau = era();
+        tau = getCurrentTimestamp();
 
-        if (_way != RAY) _par = rmul(_par, rpow(_way, age));  // optimised
+        if (_way != ONE_27) _par = rmul(_par, rpow(_way, age));  // optimised
 
         if (how == 0) return;  // optimised
         var wag = int128(how * age);
-        _way = inj(prj(_way) + (fix < _par ? wag : -wag));
+        _way = inj(prj(_way) + (wethPerDaiAtSettlement < _par ? wag : -wag));
     }
 
     function inj(int128 x) internal pure returns (uint256) {
-        return x >= 0 ? uint256(x) + RAY
-            : rdiv(RAY, RAY + uint256(-x));
+        return x >= 0 ? uint256(x) + ONE_27
+            : rdiv(ONE_27, ONE_27 + uint256(-x));
     }
     function prj(uint256 x) internal pure returns (int128) {
-        return x >= RAY ? int128(x - RAY)
-            : int128(RAY) - int128(rdiv(RAY, x));
+        return x >= ONE_27 ? int128(x - ONE_27)
+            : int128(ONE_27) - int128(rdiv(ONE_27, x));
     }
 }

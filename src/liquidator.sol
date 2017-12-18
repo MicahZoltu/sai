@@ -1,4 +1,4 @@
-/// tap.sol -- liquidation engine (see also `vow`)
+/// liquidator.sol -- liquidation engine (see also `vow`)
 
 // Copyright (C) 2017  Nikolai Mushegian <nikolai@dapphub.com>
 // Copyright (C) 2017  Daniel Brockman <daniel@dapphub.com>
@@ -19,7 +19,7 @@
 
 pragma solidity ^0.4.18;
 
-import "./tub.sol";
+import "./cdpContainer.sol";
 
 contract DaiTap is DSThing {
     DSToken  public  dai;
@@ -27,11 +27,11 @@ contract DaiTap is DSThing {
     DSToken  public  peth;
 
     DaiVox   public  vox;
-    DaiTub   public  tub;
+    DaiCdpContainer   public  cdpContainer;
 
-    uint256  public  gap;  // Boom-Bust Spread
+    uint256  public  wethToPethSpread18;  // Boom-Bust Spread
     bool     public  off;  // Cage flag
-    uint256  public  fix;  // Cage price
+    uint256  public  wethPerDaiAtSettlement;  // Cage price
 
     // Surplus
     function joy() public view returns (uint) {
@@ -47,20 +47,20 @@ contract DaiTap is DSThing {
     }
 
 
-    function DaiTap(DaiTub tub_) public {
-        tub = tub_;
+    function DaiTap(DaiCdpContainer cdpContainer_) public {
+        cdpContainer = cdpContainer_;
 
-        dai = tub.dai();
-        sin = tub.sin();
-        peth = tub.peth();
+        dai = cdpContainer.dai();
+        sin = cdpContainer.sin();
+        peth = cdpContainer.peth();
 
-        vox = tub.vox();
+        vox = cdpContainer.vox();
 
-        gap = WAD;
+        wethToPethSpread18 = ONE_18;
     }
 
     function mold(bytes32 param, uint val) public note auth {
-        if (param == 'gap') gap = val;
+        if (param == 'wethToPethSpread18') wethToPethSpread18 = val;
     }
 
     // Cancel debt
@@ -73,17 +73,17 @@ contract DaiTap is DSThing {
 
     // Feed price (dai per peth)
     function s2s() public returns (uint) {
-        var tag = tub.tag();    // ref per peth
+        var tag = cdpContainer.usdPerPeth();    // ref per peth
         var par = vox.par();    // ref per dai
         return rdiv(tag, par);  // dai per peth
     }
     // Boom price (dai per peth)
     function bid(uint wad) public returns (uint) {
-        return rmul(wad, wmul(s2s(), sub(2 * WAD, gap)));
+        return rmul(wad, wmul(s2s(), sub(2 * ONE_18, wethToPethSpread18)));
     }
     // Bust price (dai per peth)
     function ask(uint wad) public returns (uint) {
-        return rmul(wad, wmul(s2s(), gap));
+        return rmul(wad, wmul(s2s(), wethToPethSpread18));
     }
     function flip(uint wad) internal {
         require(ask(wad) > 0);
@@ -113,20 +113,20 @@ contract DaiTap is DSThing {
 
     //------------------------------------------------------------------
 
-    function cage(uint fix_) public note auth {
+    function triggerGlobalSettlement(uint fix_) public note auth {
         require(!off);
         off = true;
-        fix = fix_;
+        wethPerDaiAtSettlement = fix_;
     }
     function cash(uint wad) public note {
         require(off);
         dai.burn(msg.sender, wad);
-        require(tub.gem().transfer(msg.sender, rmul(wad, fix)));
+        require(cdpContainer.weth().transfer(msg.sender, rmul(wad, wethPerDaiAtSettlement)));
     }
     function mock(uint wad) public note {
         require(off);
         dai.mint(msg.sender, wad);
-        require(tub.gem().transferFrom(msg.sender, this, rmul(wad, fix)));
+        require(cdpContainer.weth().transferFrom(msg.sender, this, rmul(wad, wethPerDaiAtSettlement)));
     }
     function vent() public note {
         require(off);

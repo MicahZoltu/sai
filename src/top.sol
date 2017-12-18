@@ -19,76 +19,76 @@
 
 pragma solidity ^0.4.18;
 
-import "./tub.sol";
-import "./tap.sol";
+import "./cdpContainer.sol";
+import "./liquidator.sol";
 
 contract DaiTop is DSThing {
     DaiVox   public  vox;
-    DaiTub   public  tub;
-    DaiTap   public  tap;
+    DaiCdpContainer   public  cdpContainer;
+    DaiTap   public  liquidator;
 
     DSToken  public  dai;
     DSToken  public  sin;
     DSToken  public  peth;
-    ERC20    public  gem;
+    ERC20    public  weth;
 
-    uint256  public  fix;  // dai cage price (gem per dai)
-    uint256  public  fit;  // peth cage price (ref per peth)
+    uint256  public  wethPerDaiAtSettlement;  // dai triggerGlobalSettlement price (weth per dai)
+    uint256  public  usdPerPethAtSettlement;  // peth triggerGlobalSettlement price (ref per peth)
     uint256  public  caged;
     uint256  public  cooldown = 6 hours;
 
-    function DaiTop(DaiTub tub_, DaiTap tap_) public {
-        tub = tub_;
-        tap = tap_;
+    function DaiTop(DaiCdpContainer cdpContainer_, DaiTap tap_) public {
+        cdpContainer = cdpContainer_;
+        liquidator = tap_;
 
-        vox = tub.vox();
+        vox = cdpContainer.vox();
 
-        dai = tub.dai();
-        sin = tub.sin();
-        peth = tub.peth();
-        gem = tub.gem();
+        dai = cdpContainer.dai();
+        sin = cdpContainer.sin();
+        peth = cdpContainer.peth();
+        weth = cdpContainer.weth();
     }
 
-    function era() public view returns (uint) {
+    function getCurrentTimestamp() public view returns (uint) {
         return block.timestamp;
     }
 
-    // force settlement of the system at a given price (dai per gem).
-    // This is nearly the equivalent of biting all cups at once.
-    // Important consideration: the gems associated with free peth can
+    // force settlement of the system at a given price (dai per weth).
+    // This is nearly the equivalent of biting all cdps at once.
+    // Important consideration: the weths associated with free peth can
     // be tapped to make dai whole.
-    function cage(uint price) internal {
-        require(!tub.off() && price != 0);
-        caged = era();
+    function triggerGlobalSettlement(uint price) internal {
+        require(!cdpContainer.off() && price != 0);
+        caged = getCurrentTimestamp();
 
-        tub.drip();  // collect remaining fees
-        tap.heal();  // absorb any pending fees
+        cdpContainer.drip();  // collect remaining fees
+        liquidator.heal();  // absorb any pending fees
 
-        fit = rmul(wmul(price, vox.par()), tub.per());
-        // Most gems we can get per dai is the full balance of the tub.
-        // If there is no dai issued, we should still be able to cage.
+        usdPerPethAtSettlement = rmul(wmul(price, vox.par()), cdpContainer.wethPerPeth());
+        // Most weths we can get per dai is the full balance of the cdpContainer.
+        // If there is no dai issued, we should still be able to triggerGlobalSettlement.
         if (dai.totalSupply() == 0) {
-            fix = rdiv(WAD, price);
+            wethPerDaiAtSettlement = rdiv(ONE_18, price);
         } else {
-            fix = min(rdiv(WAD, price), rdiv(tub.pie(), dai.totalSupply()));
+            wethPerDaiAtSettlement = min(rdiv(ONE_18, price), rdiv(cdpContainer.wethLockedInPeth(), dai.totalSupply()));
         }
 
-        tub.cage(fit, rmul(fix, dai.totalSupply()));
-        tap.cage(fix);
+        cdpContainer.triggerGlobalSettlement(usdPerPethAtSettlement, rmul(wethPerDaiAtSettlement, dai.totalSupply()));
+        liquidator.triggerGlobalSettlement(wethPerDaiAtSettlement);
 
-        tap.vent();    // burn pending sale peth
+        liquidator.vent();    // burn pending sale peth
     }
-    // cage by reading the last value from the feed for the price
-    function cage() public note auth {
-        cage(rdiv(uint(tub.pip().read()), vox.par()));
+    // triggerGlobalSettlement by reading the last value from the feed for the price
+    function triggerGlobalSettlement() public note auth {
+        triggerGlobalSettlement(rdiv(uint(cdpContainer.usdPerEth().read()), vox.par()));
     }
 
     function flow() public note {
-        require(tub.off());
-        var empty = tub.din() == 0 && tap.fog() == 0;
-        var ended = era() > caged + cooldown;
+        require(cdpContainer.off());
+        var empty = cdpContainer.din() == 0 && liquidator.fog() == 0;
+        var ended = getCurrentTimestamp() > caged + cooldown;
         require(empty || ended);
-        tub.flow();
+        cdpContainer.flow();
     }
 
     function setCooldown(uint cooldown_) public auth {

@@ -11,7 +11,7 @@ contract TestWarp is DSNote {
         _era = uint(now);
     }
 
-    function era() public view returns (uint) {
+    function getCurrentTimestamp() public view returns (uint) {
         return _era == 0 ? now : _era;
     }
 
@@ -29,17 +29,17 @@ contract VoxTest is DSTest, DSMath {
     DevVox vox;
 
     function wad(uint256 ray_) internal pure returns (uint256) {
-        return wdiv(ray_, RAY);
+        return wdiv(ray_, ONE_27);
     }
 
     function setUp() public {
-        vox = new DevVox(RAY);
+        vox = new DevVox(ONE_27);
     }
     function testVoxDefaultPar() public {
-        assertEq(vox.par(), RAY);
+        assertEq(vox.par(), ONE_27);
     }
     function testVoxDefaultWay() public {
-        assertEq(vox.way(), RAY);
+        assertEq(vox.way(), ONE_27);
     }
     function testVoxCoax() public {
         vox.mold('way', 999999406327787478619865402);  // -5% / day

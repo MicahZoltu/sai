@@ -20,74 +20,74 @@
 pragma solidity ^0.4.18;
 
 import 'ds-thing/thing.sol';
-import './tub.sol';
+import './cdpContainer.sol';
 import './top.sol';
-import './tap.sol';
+import './liquidator.sol';
 
 contract DaiMom is DSThing {
-    DaiTub  public  tub;
-    DaiTap  public  tap;
+    DaiCdpContainer  public  cdpContainer;
+    DaiTap  public  liquidator;
     DaiVox  public  vox;
 
-    function DaiMom(DaiTub tub_, DaiTap tap_, DaiVox vox_) public {
-        tub = tub_;
-        tap = tap_;
+    function DaiMom(DaiCdpContainer cdpContainer_, DaiTap tap_, DaiVox vox_) public {
+        cdpContainer = cdpContainer_;
+        liquidator = tap_;
         vox = vox_;
     }
     // Debt ceiling
     function setCap(uint wad) public note auth {
-        tub.mold("cap", wad);
+        cdpContainer.mold("debtCeiling", wad);
     }
     // Liquidation ratio
     function setMat(uint ray) public note auth {
-        tub.mold("mat", ray);
-        var axe = tub.axe();
-        var mat = tub.mat();
-        require(axe >= RAY && axe <= mat);
+        cdpContainer.mold("liquidationRatio27", ray);
+        var liquidationPenalty27 = cdpContainer.liquidationPenalty27();
+        var liquidationRatio27 = cdpContainer.liquidationRatio27();
+        require(liquidationPenalty27 >= ONE_27 && liquidationPenalty27 <= liquidationRatio27);
     }
     // Stability fee
-    function setTax(uint ray) public note auth {
-        tub.mold("tax", ray);
-        var tax = tub.tax();
-        require(RAY <= tax);
-        require(tax < 1000001100000000000000000000);  // 10% / day
+    function setStabilityFee(uint ray) public note auth {
+        cdpContainer.mold("stabilityFee27", ray);
+        var stabilityFee27 = cdpContainer.stabilityFee27();
+        require(ONE_27 <= stabilityFee27);
+        require(stabilityFee27 < 1000001100000000000000000000);  // 10% / day
     }
     // Governance fee
     function setFee(uint ray) public note auth {
-        tub.mold("fee", ray);
-        var fee = tub.fee();
-        require(RAY <= fee);
-        require(fee < 1000001100000000000000000000);  // 10% / day
+        cdpContainer.mold("governanceFee27", ray);
+        var governanceFee27 = cdpContainer.governanceFee27();
+        require(ONE_27 <= governanceFee27);
+        require(governanceFee27 < 1000001100000000000000000000);  // 10% / day
     }
     // Liquidation fee
     function setAxe(uint ray) public note auth {
-        tub.mold("axe", ray);
-        var axe = tub.axe();
-        var mat = tub.mat();
-        require(axe >= RAY && axe <= mat);
+        cdpContainer.mold("liquidationPenalty27", ray);
+        var liquidationPenalty27 = cdpContainer.liquidationPenalty27();
+        var liquidationRatio27 = cdpContainer.liquidationRatio27();
+        require(liquidationPenalty27 >= ONE_27 && liquidationPenalty27 <= liquidationRatio27);
     }
     // Join/Exit Spread
-    function setTubGap(uint wad) public note auth {
-        tub.mold("gap", wad);
+    function setCdpContainerGap(uint wad) public note auth {
+        cdpContainer.mold("wethToPethSpread18", wad);
     }
     // ETH/USD Feed
-    function setPip(DSValue pip_) public note auth {
-        tub.setPip(pip_);
+    function setUsdPerEth(DSValue usdPerEth_) public note auth {
+        cdpContainer.setUsdPerEth(usdPerEth_);
     }
     // MKR/USD Feed
-    function setPep(DSValue pep_) public note auth {
-        tub.setPep(pep_);
+    function setDaiPerMaker(DSValue daiPerMaker_) public note auth {
+        cdpContainer.setDaiPerMaker(daiPerMaker_);
     }
     // TRFM
     function setVox(DaiVox vox_) public note auth {
-        tub.setVox(vox_);
+        cdpContainer.setVox(vox_);
     }
     // Boom/Bust Spread
     function setTapGap(uint wad) public note auth {
-        tap.mold("gap", wad);
-        var gap = tap.gap();
-        require(gap <= 1.05 ether);
-        require(gap >= 0.95 ether);
+        liquidator.mold("wethToPethSpread18", wad);
+        var wethToPethSpread18 = liquidator.wethToPethSpread18();
+        require(wethToPethSpread18 <= 1.05 ether);
+        require(wethToPethSpread18 >= 0.95 ether);
     }
     // Rate of change of target price (per second)
     function setWay(uint ray) public note auth {

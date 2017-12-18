@@ -23,10 +23,10 @@ contract SpellTest is DSTest {
     DSChief c;
     DSSpell s;
     function setUp() public {
-        var gov = new DSToken("GOV");
+        var mkr = new DSToken("MKR");
         var iou = new DSToken("IOU");
         t = new Target();
-        c = new DSChief(gov, iou, 1);
+        c = new DSChief(mkr, iou, 1);
     }
     function testRootCall() public {
         // poke() sig: 0x18178358
